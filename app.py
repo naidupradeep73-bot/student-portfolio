@@ -4,7 +4,6 @@ import uuid
 from datetime import datetime, timezone
 from functools import wraps
 from pathlib import Path
-0.3
 from bson import ObjectId
 from dotenv import load_dotenv
 from flask import Flask, abort, flash, jsonify, redirect, render_template, request, send_from_directory, session, url_for
