@@ -73,7 +73,7 @@ def admin_required(fn):
 
 def clean_slug(value):
     value = re.sub(r"[^a-z0-9]+", "-", (value or "").lower()).strip("-")
-    return value[:55] or "portfolio"
+    return value[:55] or "student-details"
 
 def unique_slug(seed, exclude=None):
     base = clean_slug(seed)
@@ -83,11 +83,11 @@ def unique_slug(seed, exclude=None):
     return slug
 
 def empty_portfolio(user):
-    return {"owner_id": user["_id"], "slug": unique_slug(user["full_name"]), "name": f"{user['full_name']}'s Portfolio", "personal": {"full_name": user["full_name"], "email": user["email"], "phone": user.get("phone", ""), "headline": "", "location": "", "intro": "", "photo": user.get("profile_photo", ""), "website": ""}, "about": {"about_me": "", "objective": "", "summary": "", "interests": "", "goals": ""}, "education": [], "skills": [], "projects": [], "certifications": [], "achievements": [], "experience": [], "social_links": {}, "resume": "", "theme": {"name": "neon", "accent": "#8b5cf6"}, "privacy": DEFAULT_PRIVACY.copy(), "section_visibility": {}, "seo": {"title": "", "description": ""}, "status": "DRAFT", "created_at": now(), "updated_at": now(), "published_at": None}
+    return {"owner_id": user["_id"], "slug": unique_slug(user["full_name"]), "name": f"{user['full_name']}'s Student Details", "personal": {"full_name": user["full_name"], "email": user["email"], "phone": user.get("phone", ""), "headline": "", "location": "", "intro": "", "photo": user.get("profile_photo", ""), "website": ""}, "about": {"about_me": "", "objective": "", "summary": "", "interests": "", "goals": ""}, "education": [], "skills": [], "projects": [], "certifications": [], "achievements": [], "experience": [], "social_links": {}, "resume": "", "theme": {"name": "neon", "accent": "#8b5cf6"}, "privacy": DEFAULT_PRIVACY.copy(), "section_visibility": {}, "seo": {"title": "", "description": ""}, "status": "DRAFT", "created_at": now(), "updated_at": now(), "published_at": None}
 
 def normalize_portfolio(portfolio, user=None):
     if not portfolio: return portfolio
-    portfolio.setdefault("name", f"{user['full_name']}'s Portfolio" if user else "Student Portfolio")
+    portfolio.setdefault("name", f"{user['full_name']}'s Student Details" if user else "Student Details")
     portfolio.setdefault("slug", unique_slug(portfolio["name"], portfolio.get("_id")))
     portfolio.setdefault("personal", {})
     portfolio["personal"].setdefault("full_name", user.get("full_name", "") if user else "")
@@ -201,7 +201,8 @@ def upload(kind):
 @app.route("/uploads/<path:filename>")
 def uploaded_file(filename): return send_from_directory(UPLOAD_DIR, filename)
 
-@app.route("/portfolio/<slug>")
+@app.route("/student-details/<slug>", endpoint="student_details_public")
+@app.route("/portfolio/<slug>", endpoint="public_portfolio")
 def public_portfolio(slug):
     p = portfolios.find_one({"slug": slug, "status": "PUBLISHED"})
     if not p: abort(404)
@@ -218,7 +219,7 @@ def preview(): return render_template("public_portfolio.html", portfolio=get_por
 def publish():
     p = get_portfolio(True); action = request.get_json(silent=True) or {}; status = "PUBLISHED" if action.get("publish", True) else "UNPUBLISHED"
     portfolios.update_one({"_id": p["_id"], "owner_id": current_user()["_id"]}, {"$set": {"status": status, "published_at": now() if status == "PUBLISHED" else None, "updated_at": now()}})
-    return jsonify({"ok": True, "status": status, "url": url_for("public_portfolio", slug=p["slug"], _external=True)})
+    return jsonify({"ok": True, "status": status, "url": url_for("student_details_public", slug=p["slug"], _external=True)})
 
 @app.route("/api/contact/<portfolio_id>", methods=["POST"])
 def contact(portfolio_id):
