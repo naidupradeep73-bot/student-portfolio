@@ -45,6 +45,7 @@ views.create_index([("portfolio_id", ASCENDING), ("viewed_at", DESCENDING)])
 
 DEFAULT_PRIVACY = {k: True for k in ["email", "phone", "location", "resume", "social", "education", "certifications", "achievements", "experience"]}
 THEMES = {"neon": "Dark Neon", "purple": "Purple Gradient", "blue": "Professional Blue", "minimal": "Minimal White", "glass": "Glassmorphism", "corporate": "Modern Corporate"}
+PORTFOLIO_LIST_FIELDS = ["education", "skills", "projects", "certifications", "achievements", "experience"]
 
 def now(): return datetime.now(timezone.utc)
 def oid(value):
@@ -84,15 +85,47 @@ def unique_slug(seed, exclude=None):
 def empty_portfolio(user):
     return {"owner_id": user["_id"], "slug": unique_slug(user["full_name"]), "name": f"{user['full_name']}'s Portfolio", "personal": {"full_name": user["full_name"], "email": user["email"], "phone": user.get("phone", ""), "headline": "", "location": "", "intro": "", "photo": user.get("profile_photo", ""), "website": ""}, "about": {"about_me": "", "objective": "", "summary": "", "interests": "", "goals": ""}, "education": [], "skills": [], "projects": [], "certifications": [], "achievements": [], "experience": [], "social_links": {}, "resume": "", "theme": {"name": "neon", "accent": "#8b5cf6"}, "privacy": DEFAULT_PRIVACY.copy(), "section_visibility": {}, "seo": {"title": "", "description": ""}, "status": "DRAFT", "created_at": now(), "updated_at": now(), "published_at": None}
 
+def normalize_portfolio(portfolio, user=None):
+    if not portfolio: return portfolio
+    portfolio.setdefault("name", f"{user['full_name']}'s Portfolio" if user else "Student Portfolio")
+    portfolio.setdefault("slug", unique_slug(portfolio["name"], portfolio.get("_id")))
+    portfolio.setdefault("personal", {})
+    portfolio["personal"].setdefault("full_name", user.get("full_name", "") if user else "")
+    portfolio["personal"].setdefault("email", user.get("email", "") if user else "")
+    portfolio["personal"].setdefault("phone", user.get("phone", "") if user else "")
+    portfolio["personal"].setdefault("headline", "")
+    portfolio["personal"].setdefault("location", "")
+    portfolio["personal"].setdefault("intro", "")
+    portfolio["personal"].setdefault("photo", user.get("profile_photo", "") if user else "")
+    portfolio["personal"].setdefault("website", "")
+    portfolio.setdefault("about", {})
+    for key in ["about_me", "objective", "summary", "interests", "goals"]:
+        portfolio["about"].setdefault(key, "")
+    for key in PORTFOLIO_LIST_FIELDS:
+        portfolio.setdefault(key, [])
+    portfolio.setdefault("social_links", {})
+    portfolio.setdefault("resume", "")
+    portfolio.setdefault("theme", {})
+    portfolio["theme"].setdefault("name", "neon")
+    portfolio["theme"].setdefault("accent", "#8b5cf6")
+    portfolio["privacy"] = {**DEFAULT_PRIVACY, **portfolio.get("privacy", {})}
+    portfolio.setdefault("section_visibility", {})
+    portfolio.setdefault("seo", {})
+    portfolio["seo"].setdefault("title", "")
+    portfolio["seo"].setdefault("description", "")
+    portfolio.setdefault("status", "DRAFT")
+    return portfolio
+
 def get_portfolio(create=False):
     user = current_user()
     portfolio = portfolios.find_one({"owner_id": user["_id"]})
     if not portfolio and create:
         portfolio = empty_portfolio(user); portfolios.insert_one(portfolio)
-    return portfolio
+    return normalize_portfolio(portfolio, user)
 
 def completion(p):
     if not p: return 0
+    p = normalize_portfolio(p)
     tests = [p["personal"].get("headline"), p["personal"].get("intro"), p["about"].get("about_me"), p["education"], p["skills"], p["projects"], p["certifications"], p["experience"], p["social_links"], p["resume"]]
     return round(sum(bool(x) for x in tests) / len(tests) * 100)
 
@@ -172,6 +205,7 @@ def uploaded_file(filename): return send_from_directory(UPLOAD_DIR, filename)
 def public_portfolio(slug):
     p = portfolios.find_one({"slug": slug, "status": "PUBLISHED"})
     if not p: abort(404)
+    p = normalize_portfolio(p)
     views.insert_one({"portfolio_id": p["_id"], "viewed_at": now()})
     return render_template("public_portfolio.html", portfolio=p, theme=THEMES.get(p["theme"].get("name"), "Dark Neon"))
 
